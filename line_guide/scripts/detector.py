@@ -20,31 +20,27 @@ class Detector:
     self.mask_pub = rospy.Publisher('mask_image', Image)
 
     #cv2.namedWindow(self.win)
-    self.h_min = 100
-    self.s_min = 60
-    self.v_min = 30
+    self.hsv_min = [100, 60, 30]
+    self.hsv_max = [150, 255, 255]
 
-    self.h_max = 150
-    self.s_max = 255
-    self.v_max = 225 
     self.showOptions()
   def hsvH_min(self, val):
-    self.h_min = val
+    self.hsv_min[0] = val
 
   def hsvS_min(self, val):
-    self.s_min = val
+    self.hsv_min[1] = val
 
   def hsvV_min(self, val):
-    self.v_min = val
+    self.hsv_min[2] = val
 
   def hsvH_max(self, val):
-    self.h_max = val
+    self.hsv_max[0] = val
 
   def hsvS_max(self, val):
-    self.s_max = val
+    self.hsv_max[1] = val
 
   def hsvV_max(self, val):
-    self.v_max = val
+    self.hsv_max[2] = val
 
   def handlecb(self, img):
     if self.busy:
@@ -55,26 +51,38 @@ class Detector:
 
   def detect(self, img):
     try:
-      cv_img = self.bridge.imgmsg_to_cv(img, 'bgr8')
+      color = self.bridge.imgmsg_to_cv(img, 'bgr8')
     except CvBridgeError, e:
       print e
       return
-    cv_img = np.asarray(cv_img)
-    cv_img = cv2.medianBlur(cv_img, 25)
-
-    try:
-      tmp = cv2.cv.fromarray(cv_img)
-      self.color_pub.publish(self.bridge.cv_to_imgmsg(tmp, 'bgr8'))
-    except CvBridgeError, e:
-      print e
+    color = np.asarray(color)
+    color = cv2.medianBlur(color, 9)
     
     # convert to HSV
-    mask = cv2.cvtColor(cv_img, cv2.cv.CV_BGR2HSV)
-    hsv_min = np.array([self.h_min, self.s_min, self.v_min])
-    hsv_max = np.array([self.h_max, self.s_max, self.v_max])
-    mask = cv2.inRange(mask, hsv_min, hsv_max) 
-    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (5,5))
+    mask = cv2.cvtColor(color, cv2.cv.CV_BGR2HSV)
+    mask = cv2.inRange(mask, np.array(self.hsv_min), np.array(self.hsv_max))
+
+    # erode & dilate
+    element = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
     mask = cv2.erode(mask, element)
+    mask = cv2.dilate(mask, element)
+
+    # find contour with largest area
+    contours = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[0]
+    max_area = 0
+    max_cont = None
+    for c in contours:
+      area = cv2.contourArea(c)
+      if area > max_area:
+        max_area = area
+        max_cont = c
+
+    # calculate center of gravity position
+    if max_cont is not None:
+      M = cv2.moments(max_cont)
+      cx, cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+      cv2.circle(color, (cx,cy), 5, (0,0,255), -1)
+      cv2.drawContours(color, [max_cont], -1, (0,255,0), 5)
 
     try:
       tmp = cv2.cv.fromarray(mask)
@@ -82,8 +90,14 @@ class Detector:
     except CvBridgeError, e:
       print e
 
+    try:
+      tmp = cv2.cv.fromarray(color)
+      self.color_pub.publish(self.bridge.cv_to_imgmsg(tmp, 'bgr8'))
+    except CvBridgeError, e:
+      print e
+
     # show image
-    # cv2.imshow(self.win, cv_img)
+    # cv2.imshow(self.win, color)
 
     # menu
     key = cv2.waitKey(10)
@@ -94,12 +108,12 @@ class Detector:
 
   def showOptions(self):
     cv2.namedWindow(self.opt)
-    cv2.createTrackbar("H_min", self.opt, self.h_min, 180, self.hsvH_min)
-    cv2.createTrackbar("S_min", self.opt, self.s_min, 255, self.hsvS_min)
-    cv2.createTrackbar("V_min", self.opt, self.v_min, 255, self.hsvV_min)
-    cv2.createTrackbar("H_max", self.opt, self.h_max, 180, self.hsvH_max)
-    cv2.createTrackbar("S_max", self.opt, self.s_max, 255, self.hsvS_max)
-    cv2.createTrackbar("V_max", self.opt, self.v_max, 255, self.hsvV_max)
+    cv2.createTrackbar("H_min", self.opt, self.hsv_min[0], 180, self.hsvH_min)
+    cv2.createTrackbar("S_min", self.opt, self.hsv_min[1], 255, self.hsvS_min)
+    cv2.createTrackbar("V_min", self.opt, self.hsv_min[2], 255, self.hsvV_min)
+    cv2.createTrackbar("H_max", self.opt, self.hsv_max[0], 180, self.hsvH_max)
+    cv2.createTrackbar("S_max", self.opt, self.hsv_max[1], 255, self.hsvS_max)
+    cv2.createTrackbar("V_max", self.opt, self.hsv_max[2], 255, self.hsvV_max)
 
 
 def main(args):

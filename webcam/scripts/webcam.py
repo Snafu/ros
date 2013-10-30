@@ -14,7 +14,7 @@ class webcam:
     self.image_pub = rospy.Publisher("webcam_image",Image)
     self.win = "Webcam"
     cv2.namedWindow(self.win)
-    self.c = cv2.VideoCapture(1)
+    self.c = cv2.VideoCapture(0)
     self.bridge = CvBridge()
     self.alive = True
 
