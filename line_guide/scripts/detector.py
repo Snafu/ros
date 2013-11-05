@@ -15,7 +15,7 @@ class Detector:
     self.win = 'Line Detector'
     self.opt = 'Options'
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber('webcam_image', Image, self.handlecb)
+    self.image_sub = rospy.Subscriber('camera/image_raw', Image, self.handlecb)
     self.color_pub = rospy.Publisher('color_image', Image)
     self.mask_pub = rospy.Publisher('mask_image', Image)
 
