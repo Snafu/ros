@@ -62,6 +62,15 @@ class Detector:
     self.detect(img)
     self.busy = False
 
+  def overlayLinefollow(self, img, org):
+    font = cv2.FONT_HERSHEY_PLAIN
+    fac = 1.0
+
+    if self.follow_line:
+      cv2.putText(img, "Line follow ON", org, font, fac, (0,255,255))
+    else:
+      cv2.putText(img, "Line follow OFF", org, font, fac, (255,255,255))
+
   def detect(self, img):
     try:
       color = self.bridge.imgmsg_to_cv(img, 'bgr8')
@@ -69,7 +78,7 @@ class Detector:
       print e
       return
     color = np.asarray(color)
-    color = cv2.medianBlur(color, 9)
+    color = cv2.medianBlur(color, 7)
     img_h, img_w, bpp = color.shape
     # clip image to bottom half
     color = color[img_h/2:, :]
@@ -80,7 +89,7 @@ class Detector:
     mask = cv2.inRange(mask, np.array(self.hsv_min), np.array(self.hsv_max))
 
     # erode & dilate
-    element = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
+    element = cv2.getStructuringElement(cv2.MORPH_RECT, (7,7))
     mask = cv2.erode(mask, element)
     mask = cv2.dilate(mask, element)
 
@@ -93,6 +102,9 @@ class Detector:
       if area > max_area:
         max_area = area
         max_cont = c
+
+    # display line follow status
+    self.overlayLinefollow(color, (1,img_h-2))
 
     # calculate center of gravity position
     if max_cont is not None:
@@ -108,7 +120,7 @@ class Detector:
 
       t = Twist()
       self.move = False
-      if self.follow_line and not -0.02 <= lcx <= 0.02:
+      if self.follow_line and (not -0.02 <= lcx <= 0.02):
         t.angular.z = copysign(0.5, lcx) * -1 * self.rotAdjust
         self.move = True
 
@@ -141,7 +153,7 @@ class Detector:
     # cv2.imshow(self.win, color)
 
     # menu
-    key = cv2.waitKey(10)
+    key = cv2.waitKey(10) % 0x100
 
     if key == ord('k'):
       self.follow_line = not self.follow_line
