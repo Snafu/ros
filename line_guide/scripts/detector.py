@@ -6,7 +6,8 @@ import rospy
 import cv2
 import numpy as np
 from math import copysign
-from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
+from geometry_msgs.msg import Twist, Point
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -18,9 +19,11 @@ class Detector:
     self.opt = 'Options'
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber('camera/image_raw', Image, self.handlecb, None, 1)
-    self.color_pub = rospy.Publisher('color_image', Image)
-    self.mask_pub = rospy.Publisher('mask_image', Image)
-    self.cmd_vel = rospy.Publisher('RosAria/cmd_vel', Twist)
+    self.color_pub = rospy.Publisher('LineFollow/color_image', Image)
+    self.mask_pub = rospy.Publisher('LineFollow/mask_image', Image)
+    self.follow_pub = rospy.Publisher('LineFollow/follow', Bool)
+    self.cmd_vel = rospy.Publisher('LineFollow/cmd_vel', Twist)
+    self.cog = rospy.Publisher('LineFollow/cog', Point)
 
     #cv2.namedWindow(self.win)
     self.hsv_min = [0, 150, 50]
@@ -31,10 +34,10 @@ class Detector:
     self.last_move = False
     self.rotAdjust = 0.1
     self.accAdjust = 0.2
-    self.lcx = 0
-    self.lcy = 0
     self.cxAvg = np.zeros(5)
     self.cyAvg = np.zeros(5)
+    self.cogX_last = -1
+    self.cogY_last = -1
 
     self.showOptions()
   def hsvH_min(self, val):
@@ -61,15 +64,6 @@ class Detector:
     self.busy = True
     self.detect(img)
     self.busy = False
-
-  def overlayLinefollow(self, img, org):
-    font = cv2.FONT_HERSHEY_PLAIN
-    fac = 1.0
-
-    if self.follow_line:
-      cv2.putText(img, "Line follow ON", org, font, fac, (0,255,255))
-    else:
-      cv2.putText(img, "Line follow OFF", org, font, fac, (255,255,255))
 
   def detect(self, img):
     try:
@@ -103,39 +97,30 @@ class Detector:
         max_area = area
         max_cont = c
 
-    # display line follow status
-    self.overlayLinefollow(color, (1,img_h-2))
-
     # calculate center of gravity position
+    cogX = self.cogX_last
+    cogY = self.cogY_last
     if max_cont is not None:
       M = cv2.moments(max_cont)
       ccx, ccy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
       self.cxAvg, cx = self.runningAvg(self.cxAvg, ccx)
       self.cyAvg, cy = self.runningAvg(self.cyAvg, ccy)
-      lcx, lcy = float(cx)/img_w - 0.5, float(img_h - cy)/img_h
+      cogX, cogY = float(cx)/img_w - 0.5, float(img_h - cy)/img_h
 
       cv2.circle(color, (ccx,ccy), 3, (0,0,255), -1)
       cv2.circle(color, (int(cx),int(cy)), 5, (255,0,0), -1)
       cv2.drawContours(color, [max_cont], -1, (0,255,0), 5)
+    else:
+      cogX, cogY = 0,0
 
-      t = Twist()
-      self.move = False
-      if self.follow_line and (not -0.02 <= lcx <= 0.02):
-        t.angular.z = copysign(0.5, lcx) * -1 * self.rotAdjust
-        self.move = True
-
-      if self.follow_line and lcy > 0.1:
-        t.linear.x = max(lcy, 0.5) * self.accAdjust
-        self.move = True
-
-
-      # check if we should drive automatically
-      if self.move or (self.last_move and not self.move):
-        self.cmd_vel.publish(t)
-      
-      self.last_move = self.move
-      
-      rospy.loginfo("Center of gravity at %.2f, %.2f", lcx, lcy )
+    if (cogX, cogY) != (self.cogX_last, self.cogY_last):
+      self.cogX_last = cogX
+      self.cogY_last = cogY
+      rospy.loginfo("Center of gravity at %.2f, %.2f", cogX, cogY)
+      try:
+        self.cog.publish(Point(cogX,cogY,0))
+      except:
+        pass
 
     try:
       tmp = cv2.cv.fromarray(mask)
@@ -149,14 +134,15 @@ class Detector:
     except CvBridgeError, e:
       print e
 
-    # show image
-    # cv2.imshow(self.win, color)
-
     # menu
     key = cv2.waitKey(10) % 0x100
 
     if key == ord('k'):
       self.follow_line = not self.follow_line
+      try:
+        self.follow_pub.publish(self.follow_line)
+      except:
+        pass
     """
     if key == ord('o'):
       self.showOptions()
