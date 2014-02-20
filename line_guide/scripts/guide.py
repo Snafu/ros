@@ -29,8 +29,8 @@ class Guide:
     self.active_last = False
     self.moving = False
     self.moving_last = False
-    self.rotAdjust = 0.1
-    self.accAdjust = 0.2
+    self.rotAdjust = 0.2
+    self.accAdjust = 0.1
     self.backupDuration = 1.0
     self.backup = False
     
@@ -84,7 +84,7 @@ class Guide:
         t.angular.z = math.copysign(0.5, self.cog.x) * -1 * self.rotAdjust
         self.moving = True
 
-      if self.cog.y > 0.1:
+      if self.cog.y > 0.2:
         t.linear.x = max(self.cog.y, 0.5) * self.accAdjust
         self.moving = True
 

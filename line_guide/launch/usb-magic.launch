@@ -4,7 +4,7 @@
   <include file="$(find line_guide)/launch/webcam.launch" />
 	<node name="line_debug" pkg="line_guide" type="debug.py" output="screen" />
 	<node name="line_detector" pkg="line_guide" type="detector.py" output="screen" />
-	<node name="line_guide" pkg="line_guide" type="guide.py" output="screen" />
+	<!-- <node name="line_guide" pkg="line_guide" type="guide.py" output="screen" /> -->
 	<node name="line_color" pkg="image_view" type="image_view" output="screen">
 		<remap from="image" to="$(arg color_img)" />
 	</node>

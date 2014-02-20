@@ -28,6 +28,8 @@ class Detector:
     #cv2.namedWindow(self.win)
     self.hsv_min = [0, 150, 50]
     self.hsv_max = [10, 255, 255]
+    self.hsv_min2 = [170, 150, 50]
+    self.hsv_max2 = [180, 255, 255]
 
     self.follow_line = False
     self.move = False
@@ -74,13 +76,15 @@ class Detector:
     color = np.asarray(color)
     color = cv2.medianBlur(color, 7)
     img_h, img_w, bpp = color.shape
-    # clip image to bottom half
-    color = color[img_h/2:, :]
+    # clip image to bottom third
+    color = color[2*img_h/3:, :]
     img_h, img_w, bpp = color.shape
     
     # convert to HSV
     mask = cv2.cvtColor(color, cv2.cv.CV_BGR2HSV)
+    mask2 = cv2.inRange(mask, np.array(self.hsv_min2), np.array(self.hsv_max2))
     mask = cv2.inRange(mask, np.array(self.hsv_min), np.array(self.hsv_max))
+    mask = cv2.bitwise_or(mask, mask2)
 
     # erode & dilate
     element = cv2.getStructuringElement(cv2.MORPH_RECT, (7,7))
