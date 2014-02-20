@@ -1,0 +1,15 @@
+<launch>
+	<arg name="device" value="/dev/video1" />
+	<arg name="width" value="160" />
+	<arg name="height" value="120" />
+	<arg name="format" value="yuyv" />
+	<arg name="method" value="mmap" />
+  <!-- <include file="$(find line_guide)/launch/webcam.launch" /> -->
+	<node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen">
+		<param name="video_device" value="$(arg device)" />
+		<param name="image_width" value="$(arg width)" />
+		<param name="image_height" value="$(arg height)" />
+		<param name="pixel_format" value="$(arg format)" />
+		<param name="io_method" value="$(arg method)" />
+	</node>
+</launch>
