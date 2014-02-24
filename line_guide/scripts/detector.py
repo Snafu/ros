@@ -8,28 +8,23 @@ import numpy as np
 from math import copysign
 from std_msgs.msg import Bool
 from geometry_msgs.msg import Twist, Point
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
-
+from sensor_msgs.msg import Image, CompressedImage
 
 class Detector:
   def __init__(self):
     self.busy = False
     self.win = 'Line Detector'
     self.opt = 'Options'
-    self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber('camera/image_raw', Image, self.handlecb, None, 1)
-    self.color_pub = rospy.Publisher('LineFollow/color_image', Image)
-    self.mask_pub = rospy.Publisher('LineFollow/mask_image', Image)
+    self.image_sub = rospy.Subscriber('camera/image_raw/compressed', CompressedImage, self.handlecb, queue_size = 1)
+    self.color_pub = rospy.Publisher('LineFollow/color_image/compressed', CompressedImage)
+    self.mask_pub = rospy.Publisher('LineFollow/mask_image/compressed', CompressedImage)
     self.follow_pub = rospy.Publisher('LineFollow/follow', Bool)
     self.cmd_vel = rospy.Publisher('LineFollow/cmd_vel', Twist)
     self.cog = rospy.Publisher('LineFollow/cog', Point)
 
     #cv2.namedWindow(self.win)
-    self.hsv_min = [0, 150, 50]
+    self.hsv_min = [0, 100, 50]
     self.hsv_max = [10, 255, 255]
-    self.hsv_min2 = [170, 150, 50]
-    self.hsv_max2 = [180, 255, 255]
 
     self.follow_line = False
     self.move = False
@@ -68,12 +63,10 @@ class Detector:
     self.busy = False
 
   def detect(self, img):
-    try:
-      color = self.bridge.imgmsg_to_cv(img, 'bgr8')
-    except CvBridgeError, e:
-      print e
-      return
-    color = np.asarray(color)
+    # decode image
+    np_arr = np.fromstring(img.data, np.uint8)
+    color = cv2.imdecode(np_arr, cv2.CV_LOAD_IMAGE_COLOR)
+
     color = cv2.medianBlur(color, 7)
     img_h, img_w, bpp = color.shape
     # clip image to bottom third
@@ -82,7 +75,11 @@ class Detector:
     
     # convert to HSV
     mask = cv2.cvtColor(color, cv2.cv.CV_BGR2HSV)
-    mask2 = cv2.inRange(mask, np.array(self.hsv_min2), np.array(self.hsv_max2))
+    hsv_min2 = list(self.hsv_min)
+    hsv_min2[0] = 180 - self.hsv_max[0]
+    hsv_max2 = list(self.hsv_max)
+    hsv_max2[0] = 180 - self.hsv_min[0]
+    mask2 = cv2.inRange(mask, np.array(hsv_min2), np.array(hsv_max2))
     mask = cv2.inRange(mask, np.array(self.hsv_min), np.array(self.hsv_max))
     mask = cv2.bitwise_or(mask, mask2)
 
@@ -120,37 +117,31 @@ class Detector:
     if (cogX, cogY) != (self.cogX_last, self.cogY_last):
       self.cogX_last = cogX
       self.cogY_last = cogY
-      rospy.loginfo("Center of gravity at %.2f, %.2f", cogX, cogY)
-      try:
-        self.cog.publish(Point(cogX,cogY,0))
-      except:
-        pass
+      # rospy.loginfo("Center of gravity at %.2f, %.2f", cogX, cogY)
+      self.cog.publish(Point(cogX,cogY,0))
 
-    try:
-      tmp = cv2.cv.fromarray(mask)
-      self.mask_pub.publish(self.bridge.cv_to_imgmsg(tmp, 'mono8'))
-    except CvBridgeError, e:
-      print e
+    #### Create CompressedIamge ####
+    msg = CompressedImage()
+    msg.header.stamp = rospy.Time.now()
+    msg.format = "jpeg"
+    msg.data = np.array(cv2.imencode('.jpg', color)[1]).tostring()
+    # Publish new image
+    self.color_pub.publish(msg)
 
-    try:
-      tmp = cv2.cv.fromarray(color)
-      self.color_pub.publish(self.bridge.cv_to_imgmsg(tmp, 'bgr8'))
-    except CvBridgeError, e:
-      print e
+    #### Create CompressedIamge ####
+    msg = CompressedImage()
+    msg.header.stamp = rospy.Time.now()
+    msg.format = "jpeg"
+    msg.data = np.array(cv2.imencode('.jpg', mask)[1]).tostring()
+    # Publish new image
+    self.mask_pub.publish(msg)
 
     # menu
     key = cv2.waitKey(10) % 0x100
-
     if key == ord('k'):
       self.follow_line = not self.follow_line
-      try:
-        self.follow_pub.publish(self.follow_line)
-      except:
-        pass
-    """
-    if key == ord('o'):
-      self.showOptions()
-    """
+      self.follow_pub.publish(self.follow_line)
+
 
   def runningAvg(self, l, i): 
     l = np.roll(l, 1)

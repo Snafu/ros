@@ -10,12 +10,10 @@ from std_msgs.msg import Bool
 from geometry_msgs.msg import Twist, Point
 from sensor_msgs.msg import Image, PointCloud
 from ROSARIA.msg import BumperState
-from cv_bridge import CvBridge, CvBridgeError
 
 
 class Guide:
   def __init__(self):
-    self.bridge = CvBridge()
     self.bumper_sub = rospy.Subscriber('RosAria/bumper_state', BumperState, self.cbBumper, queue_size=1)
     self.cog_sub = rospy.Subscriber('LineFollow/cog', Point, self.cbCog, queue_size=1)
     self.sonar_sub = rospy.Subscriber('Sensors/sonar', PointCloud, self.cbSonar)
@@ -77,6 +75,8 @@ class Guide:
     self.update()
 
   def update(self):
+    if self.backup:
+      return
     t = Twist()
     self.moving = False
     if self.active:

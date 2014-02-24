@@ -1,0 +1,13 @@
+<launch>
+	<arg name="color_img" value="/LineFollow/debug_image" />
+	<arg name="mask_img" value="/LineFollow/mask_image" />
+	<node name="line_debug" pkg="line_guide" type="debug.py" output="screen" />
+	<node name="line_color" pkg="image_view" type="image_view" output="screen">
+		<remap from="image" to="$(arg color_img)" />
+    <param name="image_transport" value="compressed" />
+	</node>
+	<node name="line_mask" pkg="image_view" type="image_view" output="screen">
+		<remap from="image" to="$(arg mask_img)" />
+    <param name="image_transport" value="compressed" />
+	</node>
+</launch>

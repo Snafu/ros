@@ -8,15 +8,13 @@ import numpy as np
 import math
 from std_msgs.msg import Bool
 from geometry_msgs.msg import Twist, Point
-from sensor_msgs.msg import Image, PointCloud
-from cv_bridge import CvBridge, CvBridgeError
+from sensor_msgs.msg import Image, CompressedImage, PointCloud
 
 
 class Debug:
   def __init__(self):
-    self.bridge = CvBridge()
-    self.image_pub = rospy.Publisher('LineFollow/debug_image', Image)
-    self.image_sub = rospy.Subscriber('LineFollow/color_image', Image, self.cbImage, None, 1)
+    self.image_pub = rospy.Publisher('LineFollow/debug_image/compressed', CompressedImage)
+    self.image_sub = rospy.Subscriber('LineFollow/color_image/compressed', CompressedImage, self.cbImage, queue_size = 1)
     self.active_sub = rospy.Subscriber('LineFollow/active', Bool, self.cbActive)
     self.cog_sub = rospy.Subscriber('LineFollow/cog', Point, self.cbCog)
     self.sonar_sub = rospy.Subscriber('Sensors/sonar', PointCloud, self.cbSonar)
@@ -55,20 +53,19 @@ class Debug:
     self.cog = p
 
   def cbImage(self, img):
-    try:
-      color = self.bridge.imgmsg_to_cv(img, 'bgr8')
-    except CvBridgeError, e:
-      print e
-      return
-    color = np.asarray(color)
+    # decode image
+    np_arr = np.fromstring(img.data, np.uint8)
+    color = cv2.imdecode(np_arr, cv2.CV_LOAD_IMAGE_COLOR)
     
-    # publish image
     self.overlayInfo(color)
-    try:
-      tmp = cv2.cv.fromarray(color)
-      self.image_pub.publish(self.bridge.cv_to_imgmsg(tmp, 'bgr8'))
-    except CvBridgeError, e:
-      print e
+    
+    #### Create CompressedIamge ####
+    msg = CompressedImage()
+    msg.header.stamp = rospy.Time.now()
+    msg.format = "jpeg"
+    msg.data = np.array(cv2.imencode('.jpg', color)[1]).tostring()
+    # Publish new image
+    self.image_pub.publish(msg)
 
 def main(args):
   rospy.init_node('debug')
