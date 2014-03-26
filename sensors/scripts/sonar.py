@@ -11,14 +11,19 @@ class Sonar:
     self.pub = rospy.Publisher('/Sensors/sonar', PointCloud)
 
   def callback(self, pc):
-
     for p in pc.points:
       dist = (math.sqrt(math.pow(p.x,2) + math.pow(p.y,2))*100.0)
-      p.x = dist - 30 # bot radius
+      # subtract bot radius
+      if dist > 30:
+        dist -= 30
+      else:
+        dist = 0
+      p.x = dist
       p.y = 0
       p.z = 0
 
     try:
+      # publish distances in cm
       self.pub.publish(pc)
     except:
       pass

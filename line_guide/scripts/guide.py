@@ -53,16 +53,14 @@ class Guide:
     vector = [0,0]
     length = len(pc.points)-1
     scale = max([p.x for p in pc.points])*length
-    #rospy.loginfo("#####################")
+    """
     for i,p in enumerate(pc.points):
       vector[0] += p.x * -math.cos(math.pi*i/length)
       vector[1] += p.x * math.sin(math.pi*i/length)
-      #rospy.loginfo("{0:.2f} {1:.2f} {2:.2f}".format(p.x, math.cos(math.pi*i/length), math.sin(math.pi*i/length)))
-    #rospy.loginfo("{0:.2f} {1:.2f}".format(vector[0], 180-(180*vector[1]/math.pi)))
     val = sum([math.pow(x,2) for x in vector])
     phi = 180*math.atan2(vector[1], vector[0])/math.pi
-    rospy.loginfo("{0:.2f} {1:.2f}".format(val, phi))
-      
+    #rospy.loginfo("{0:.2f} {1:.2f}".format(val, phi))
+    """  
     self.update()
 
   def cbCog(self, p):

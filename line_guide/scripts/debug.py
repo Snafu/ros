@@ -28,12 +28,19 @@ class Debug:
     fac = 1.0
 
     img_h, img_w, bpp = img.shape
+    cv2.line(img, (0, img_h/2), (img_w, img_h/2), (255,255,255), 1)
     
     if self.sonar is not None:
+      """
       sonar_len = len(self.sonar)
       spacer = img_h/2/sonar_len
       for i, p in enumerate(self.sonar):
         cv2.line(img, (1,5 + spacer*i), (1 + int(p.x*img_w/2/100), 5 + spacer*i), (0,255,255), 2)
+      """
+      for i, p in enumerate(self.sonar):
+        x = 3*img_w/5 + 10*i
+        y = img_h - min(img_h, int(p.x*img_h/100))
+        cv2.line(img, (x,img_h-1), (x, y), (0,255,255,255), 2)
     
     org = (1, img_h-2)
     if self.active:
