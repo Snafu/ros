@@ -13,7 +13,6 @@ from sensor_msgs.msg import Image, CompressedImage
 class Detector:
   def __init__(self):
     self.busy = False
-    self.win = 'Line Detector'
     self.opt = 'Options'
     self.image_sub = rospy.Subscriber('camera/image_raw/compressed', CompressedImage, self.handlecb, queue_size = 1)
     self.color_pub = rospy.Publisher('LineFollow/color_image/compressed', CompressedImage)
@@ -22,7 +21,6 @@ class Detector:
     self.cmd_vel = rospy.Publisher('LineFollow/cmd_vel', Twist)
     self.cog = rospy.Publisher('LineFollow/cog', Point)
 
-    #cv2.namedWindow(self.win)
     self.hsv_min = [0, 100, 50]
     self.hsv_max = [10, 255, 255]
 
@@ -37,6 +35,7 @@ class Detector:
     self.cogY_last = -1
 
     self.showOptions()
+
   def hsvH_min(self, val):
     self.hsv_min[0] = val
 
@@ -114,7 +113,7 @@ class Detector:
     else:
       cogX, cogY = 0,0
 
-    if (cogX, cogY) != (self.cogX_last, self.cogY_last):
+    if True or (cogX, cogY) != (self.cogX_last, self.cogY_last):
       self.cogX_last = cogX
       self.cogY_last = cogY
       # rospy.loginfo("Center of gravity at %.2f, %.2f", cogX, cogY)

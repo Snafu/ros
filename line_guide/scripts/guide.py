@@ -28,9 +28,31 @@ class Guide:
     self.moving = False
     self.moving_last = False
     self.rotAdjust = 0.2
-    self.accAdjust = 0.1
     self.backupDuration = 1.0
     self.backup = False
+
+    # steering PID settings
+    self.s_Kp = 0.5
+    self.s_Ki = 0.3
+    self.s_Kd = 0.1
+    self.s_err = 0
+    self.s_err_prev = 0
+    self.s_int = 0
+    self.s_der = 0
+    self.s_max = 0.6
+
+    # throttle PID settings
+    self.t_Kp = 0.2
+    self.t_Ki = 0.5
+    self.t_Kd = 0.1
+    self.t_err = 0
+    self.t_err_prev = 0
+    self.t_int = 0
+    self.t_der = 0
+    self.t_max = 1.0
+    self.t_factor = 0.1
+
+    self.lastupdate = rospy.rostime.get_time()
     
   def cbBumper(self, bump):
     mdir = 0
@@ -75,19 +97,57 @@ class Guide:
   def update(self):
     if self.backup:
       return
+
     t = Twist()
     self.moving = False
+
+    time = rospy.get_time()
+    dt = time - self.lastupdate
+    # reset if dt too large
+    if dt > 1:
+      dt = 0.1
+      s_int = 0
+      s_err_prev = 0
+      t_int = 0
+      t_err_prev = 0
+
+    s_output = 0
+    t_output = 0
+
     if self.active:
-      if not -0.02 <= self.cog.x <= 0.02:
-        t.angular.z = math.copysign(0.5, self.cog.x) * -1 * self.rotAdjust
+      if not -0.01 <= self.cog.x <= 0.01:
+        # steering PID
+        self.s_err = 0 - self.cog.x
+        self.s_int = self.s_int + self.s_err*dt
+        self.s_der = (self.s_err - self.s_err_prev)/dt
+        s_output = self.s_Kp*self.s_err + self.s_Ki*self.s_int + self.s_Kd*self.s_der
+        self.s_err_prev = self.s_err
+
+        s_output = -self.s_max if s_output < -self.s_max else self.s_max if s_output > self.s_max else s_output
+        t.angular.z = s_output # * self.rotAdjust
+
         self.moving = True
 
-      if self.cog.y > 0.2:
-        t.linear.x = max(self.cog.y, 0.5) * self.accAdjust
+      if self.cog.y > 0.01:
+        # throttle PID (not really necessary, always max throttle)
+        self.t_err = self.cog.y
+        self.t_int = self.t_int + self.t_err*dt
+        self.t_der = (self.t_err - self.t_err_prev)/dt
+        t_output = self.t_Kp*self.t_err + self.t_Ki*self.t_int + self.t_Kd*self.t_der
+        self.t_err_prev = self.t_err
+
+        # limit max throttle
+        t_output = self.t_max if t_output > self.t_max else t_output
+
+        t.linear.x = t_output * self.t_factor
+
         self.moving = True
+
+    self.lastupdate = time
 
     # check if we should drive automatically
     if self.moving or (self.moving_last and not self.moving):
+      rospy.loginfo("{0:4.2f},{1:4.2f} @ {2:.3f}".format(s_output, t_output, dt))
       self.move(t)    
     self.moving_last = self.moving
 
